@@ -24,6 +24,23 @@ from utils.utils import readout
 
 
 def sp_softmax(indices, values, N):
+    """
+    Compute the sparse softmax of the given values.
+
+    Parameters
+    ----------
+    indices : torch.tensor
+        The indices of the non-zero elements in the sparse tensor.
+    values : torch.tensor
+        The values of the non-zero elements in the sparse tensor.
+    N : int
+        The size of the output tensor.
+
+    Returns
+    -------
+    softmax_v : torch.tensor
+        The softmax values computed for the sparse tensor.
+    """
     source, _ = indices
     v_max = values.max()
     exp_v = torch.exp(values - v_max)
@@ -35,46 +52,89 @@ def sp_softmax(indices, values, N):
 
 
 def sp_matmul(indices, values, mat):
+    """
+    Perform sparse matrix multiplication.
+    Parameters
+    ----------
+    indices : torch.tensor
+        The indices of the non-zero elements in the sparse tensor.
+    values : torch.tensor
+        The values of the non-zero elements in the sparse tensor.
+    mat : torch.tensor
+        The dense matrix to be multiplied with the sparse tensor.
+
+    Returns
+    -------
+    out : torch.tensor
+        The result of the sparse matrix multiplication.
+    """ 
     source, target = indices
     out = torch.zeros_like(mat)
     out.scatter_add_(0, source.expand(mat.size(1), -1).t(), values * mat[target])
     return out
 
-class CellLayer(nn.Module):
 
-    def __init__(self,F_in: int, F_out: int, 
-                       cell_forward_activation: Callable,
-                       cell_forward_dropout: float,
-                       param_init: str):
-       
+class CellLayer(nn.Module):
+    """
+    A Cell layer for a Cellular Attention Network (CAN).
+    This layer is responsible for learning the cell update rules in the
+    network using learnable weight matrices.
+
+    Parameters
+    ----------
+    F_in : int
+        Number of input features.
+    F_out : int
+        Number of output features.
+    cell_forward_activation : Callable
+        Non-linear activation function for the cell forward operation.
+    cell_forward_dropout : float
+        Dropout rate applied after the cell forward operation.
+    param_init : str
+        The initialization method for the learnable weight matrices.
+        Choices: 'uniform', 'normal'
+
+    Examples
+    --------
+    >>> cell_layer = CellLayer(F_in=10, F_out=20, cell_forward_activation=torch.relu, cell_forward_dropout=0.5, param_init='uniform')
+    """
+
+    def __init__(self, F_in: int, F_out: int,
+                 cell_forward_activation: Callable,
+                 cell_forward_dropout: float,
+                 param_init: str):
+
         super(CellLayer, self).__init__()
 
         self.F_in = F_in
         self.F_out = F_out
         self.Wirr = nn.Parameter(torch.empty(size=(F_in, F_out)))
-        self.Wsol = nn.Parameter(torch.empty(size=( F_in, F_out)))
+        self.Wsol = nn.Parameter(torch.empty(size=(F_in, F_out)))
         self.Wskip = nn.Parameter(torch.empty(size=(F_in, F_out)))
         self.W = nn.Parameter(torch.empty(size=(F_out, F_out)))
         self.Wout = nn.Parameter(torch.empty(size=(F_out, F_out)))
-        
+
         self.param_init = param_init
-        
+
         self.cell_forward_activation = cell_forward_activation
-        self.cell_forward_dropout = cell_forward_dropout  # 0.0#0.6
-        #self.reset_parameters()
+        self.cell_forward_dropout = cell_forward_dropout
+        self.reset_parameters()
 
     def __repr__(self):
         s = "CellLayer(" + \
             "F_in=" + str(self.F_in) + \
-            ", F_out=" + str(self.F_out) +  \
-            ", Fwd_Activ="+str(self.cell_attention_activation)+\
-            ", Fwd_Dropout="+str(self.dropout) + ")"
-            
+            ", F_out=" + str(self.F_out) + \
+            ", Fwd_Activ=" + str(self.cell_forward_activation) + \
+            ", Fwd_Dropout=" + str(self.cell_forward_dropout) + ")"
         return s
 
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        """
+        Reinitialize the learnable weight matrices of the cell layer.
+        The initialization method is determined by the `param_init` parameter.
+        """
         gain = nn.init.calculate_gain('relu')
+
         if self.param_init == 'uniform':
             nn.init.xavier_uniform_(self.Wirr.data, gain=gain)
             nn.init.xavier_uniform_(self.Wsol.data, gain=gain)
@@ -87,7 +147,6 @@ class CellLayer(nn.Module):
             nn.init.xavier_normal_(self.Wskip.data, gain=gain)
             nn.init.xavier_normal_(self.W.data, gain=gain)
             nn.init.xavier_normal_(self.Wout.data, gain=gain)
-            
 
 
 

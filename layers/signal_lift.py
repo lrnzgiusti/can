@@ -17,69 +17,89 @@ NodeSignal = TypeVar('NodeSignal')
 EdgeSignal = TypeVar('EdgeSignal')
 Graph = TypeVar('Graph')
 
-class LiftLayer(nn.Module):
-     
-    """
-     Parameters
-     ----------
-     F_in : int
-         Number of input features for the single lift layer.
-     signal_lift_activation : Callable
-         non-linear activation function for the signal lift.
-     signal_lift_dropout : float
-         dropout is applied after the lift.
-    
-    """
-    def __init__(self, F_in: int, 
-                       signal_lift_activation: Callable,
-                       signal_lift_dropout: float):
-       
 
+class LiftLayer(nn.Module):
+    """
+    A single lift layer for a Cell Attention Network (CAN).
+    This layer is responsible for lifting node feature vectors into
+    edge features using a learnable function
+
+    Parameters
+    ----------
+    F_in : int
+        Number of input features for the single lift layer.
+    signal_lift_activation : Callable
+        Non-linear activation function for the signal lift.
+    signal_lift_dropout : float
+        Dropout rate applied after the lift.
+
+    Examples
+    --------
+    >>> lift_layer = LiftLayer(F_in=10, signal_lift_activation=torch.relu, signal_lift_dropout=0.5)
+    """
+    def __init__(self, F_in: int,
+                 signal_lift_activation: Callable,
+                 signal_lift_dropout: float):
         super(LiftLayer, self).__init__()
 
         self.F_in = F_in
-        self.att =  nn.Parameter(torch.empty(size=(2*F_in, 1)))
+        self.att = nn.Parameter(torch.empty(size=(2 * F_in, 1)))
         self.signal_lift_activation = signal_lift_activation
-        self.signal_lift_dropout = signal_lift_dropout  # 0.0#0.6
+        self.signal_lift_dropout = signal_lift_dropout
         self.reset_parameters()
 
     def __repr__(self):
         return "LiftLayer(" + \
-            "F_in="+str(self.F_in)+\
-            ", Activation=" +str(self.signal_lift_activation) + \
-            ", Dropout=" +str(self.signal_lift_dropout)+")"
-        
+               "F_in=" + str(self.F_in) + \
+               ", Activation=" + str(self.signal_lift_activation) + \
+               ", Dropout=" + str(self.signal_lift_dropout) + ")"
+
     def to(self, device):
         super().to(device)
         return self
-        
-        
+
     def reset_parameters(self):
-        """Reinitialize learnable parameters."""
+        """Reinitialize learnable parameters using Xavier uniform initialization."""
         gain = nn.init.calculate_gain('relu')
         nn.init.xavier_uniform_(self.att.data, gain=gain)
 
     def forward(self, x: Tuple[NodeSignal, Graph]) -> EdgeSignal:
-        
-        x, G = x
-        
-        
-        s,t = G.edge_index
-        x_st = torch.cat((x[s], x[t]), dim=1)
-        out = self.signal_lift_activation(x_st.mm(self.att))
-        
         """
-        #tensor -- broadcast sum
-        E = ((x @ self.att[:self.F_in]) + (
-            x @ self.att[self.F_in:]).T) # (NxFin) + (FinxN) -> (NxN)
-        
-        x = E[G.connectivities['adj']].reshape(-1,1)
-        
-        return self.signal_lift_activation(F.dropout(x, self.signal_lift_dropout,
-                                                     training=self.training))
-        """
-        return out
+        Perform the forward pass for a single lift layer.
 
+        Parameters
+        ----------
+        x : Tuple[NodeSignal, Graph]
+            Input tuple containing the node signal (node feature vectors)
+            and the graph structure (Graph object).
+
+        Returns
+        -------
+        EdgeSignal
+            The resulting edge signal after the lift layer operation.
+
+        Notes
+        -----
+        The forward pass can be described as follows:
+        1. Extract source and target nodes from the input graph's edge index.
+        2. Concatenate source and target node feature vectors.
+        3. Compute the output edge signal by applying the activation function to the
+           matrix multiplication of the concatenated node features and the attention
+           coefficients.
+        """
+        # Unpack input tuple into node signal and graph structure
+        node_signal, graph = x
+
+        # Extract source and target nodes from the graph's edge index
+        source, target = graph.edge_index
+
+        # Concatenate source and target node feature vectors
+        node_features_stacked = torch.cat((node_signal[source], node_signal[target]), dim=1)
+
+        # Compute the output edge signal by applying the activation function
+        edge_signal = self.signal_lift_activation(node_features_stacked.mm(self.att))
+
+        return edge_signal
 
 
 

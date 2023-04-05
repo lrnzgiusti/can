@@ -272,7 +272,7 @@ class CellAttentionLayer(CellLayer):
         
         x = F.dropout(x, self.dropout, training=self.training)
         
-        #out = (1.001)*(x @ self.Wskip) if self.skip else torch.tensor(0.0)
+        out = (1.001)*(x @ self.Wskip) if self.skip else torch.tensor(0.0)
         
         
         try:
@@ -397,31 +397,46 @@ class MultiHeadCellAttentionLayer(nn.Module):
 
 
 class CAPooLayer(nn.Module):
+    """
+    CAPooLayer (Cellular Attention Pooling Layer) is responsible for pooling
+    operations in the Cellular Graph Attention Network.
 
-    def __init__(self, k_pool:float,  F_in:int, cell_forward_activation:Callable) :
-        """
-        Returns
-        -------
-        CAPooLayer.
-        
-        
-        Examples
-        -------
-        pool = CAPooLayer(k_pool=.75, 
-                          F_in=3*att_heads, 
-                          cell_forward_activation=nn.ReLU)
+    This layer applies attention-based pooling to a given edge signal
+    and updates the graph accordingly.
 
-        """
+    Parameters
+    ----------
+    k_pool : float
+        Fraction of nodes to keep after the pooling operation.
+    F_in : int
+        Number of input features for the pooling layer.
+    cell_forward_activation : Callable
+        Non-linear activation function used in the forward pass.
+
+    Returns
+    -------
+    CAPooLayer.
+
+    Examples
+    -------
+    pool = CAPooLayer(k_pool=.75,
+                      F_in=3*att_heads,
+                      cell_forward_activation=nn.ReLU)
+    """
+
+    def __init__(self, k_pool: float, F_in: int, cell_forward_activation: Callable):
         super(CAPooLayer, self).__init__()
-        
+
         self.k_pool = k_pool
         self.cell_forward_activation = cell_forward_activation
-        
-        self.att_pool = nn.Parameter(
-                            torch.empty(size=(F_in, 1)))
-        
+
+        # Learnable attention parameter for the pooling operation
+        self.att_pool = nn.Parameter(torch.empty(size=(F_in, 1)))
+
+        # Initialize the attention parameter using Xavier initialization
         nn.init.xavier_normal_(self.att_pool.data, gain=1.41)
 
+        
     def __repr__(self):
        s = "PoolLayer(" + \
            "K Pool="+str(self.k_pool)+ ")"

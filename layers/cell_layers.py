@@ -185,34 +185,60 @@ class TopologicalNorm(torch.nn.Module):
         x, G = x
         return self.tn(x), G
 
+
 class CellAttentionLayer(CellLayer):
+    """
+    Attention-based cell layer of Cellular Attention Network.
+    
+    This layer inherits from the CellLayer class and adds an attention mechanism
+    for the information exchange between the edges weighted by learnable attention
+    coefficients. 
+
+    Parameters
+    ----------
+    F_in : int
+        Number of input features for the cell attention layer.
+    F_out : int
+        Number of output features for the cell attention layer.
+    skip : bool
+        Whether to add skip connections in the attention layer.
+    cell_attention_activation : Callable
+        Non-linear activation function for the cell attention mechanism.
+    cell_forward_activation : Callable
+        Non-linear activation function for the forward pass of the cell layer.
+    cell_attention_dropout : float
+        Dropout rate applied to the attention mechanism.
+    cell_forward_dropout : float
+        Dropout rate applied to the forward pass of the cell layer.
+    param_init : str
+        Parameter initialization method, either 'uniform' or 'normal'.
+    """
 
     def __init__(self, F_in: int, F_out: int, skip: bool,
-                       cell_attention_activation: Callable,
-                       cell_forward_activation: Callable,
-                       cell_attention_dropout: float,
-                       cell_forward_dropout: float,
-                       param_init: str):
-        
+                 cell_attention_activation: Callable,
+                 cell_forward_activation: Callable,
+                 cell_attention_dropout: float,
+                 cell_forward_dropout: float,
+                 param_init: str):
+
+        # Call the constructor of the parent class (CellLayer)
         super(CellAttentionLayer, self).__init__(F_in=F_in,
                                                  F_out=F_out,
                                                  cell_forward_activation=cell_forward_activation,
                                                  cell_forward_dropout=cell_forward_dropout,
                                                  param_init=param_init)
 
+        # Define learnable parameters for the attention mechanism
+        self.att_irr = nn.Parameter(torch.empty(size=(2 * self.F_out, 1)))
+        self.att_sol = nn.Parameter(torch.empty(size=(2 * self.F_out, 1)))
 
-        self.att_irr = nn.Parameter(
-                            torch.empty(size=(2*self.F_out, 1)))
-        self.att_sol = nn.Parameter(
-                            torch.empty(size=(2*self.F_out, 1)))
-        
-        
         self.param_init = param_init
         self.skip = skip
-        
+
         self.cell_attention_activation = cell_attention_activation
         self.dropout = cell_attention_dropout
 
+        # Reset and initialize parameters
         self.reset_parameters()
         
     def __repr__(self):

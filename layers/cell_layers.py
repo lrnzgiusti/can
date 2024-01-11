@@ -266,15 +266,9 @@ class CellAttentionLayer(CellLayer):
     
     
     def forward(self, x: Tuple[EdgeSignal, Graph]) -> EdgeSignal:
-       
-        
         x, G = x
-        
         x = F.dropout(x, self.dropout, training=self.training)
-        
         out = (1.001)*(x @ self.Wskip) if self.skip else torch.tensor(0.0)
-        
-        
         try:
             h = torch.matmul(x, self.Wirr)
             source, target = G.connectivities['do']
@@ -306,8 +300,6 @@ class CellAttentionLayer(CellLayer):
             h_prime = torch.tensor(0.0)
         
         out += h_prime
-    
-        
         return self.cell_forward_activation(out), G
 
 
